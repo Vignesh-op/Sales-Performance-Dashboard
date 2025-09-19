@@ -5,12 +5,6 @@ It allows you to upload your own sales JSON file and instantly explore performan
 
 Follow these steps to set up and run the dashboard:
 
-1️⃣ Clone or Download the Repository
-# Clone with Git
-git clone https://github.com/your-username/sales-dashboard.git
-
-# Or download the ZIP and extract it
-
 2️⃣ Open the Project
 
 Navigate to the project folder and open the file:
