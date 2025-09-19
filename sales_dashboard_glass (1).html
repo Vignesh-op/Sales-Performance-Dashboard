@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Glassmorphism Sales Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body {
+      font-family: Inter, Arial, sans-serif;
+      background: #e0f7fa; /* icy blue background */
+      margin: 0;
+      padding: 24px;
+      color: #0f172a;
+    }
+    h2 {
+      text-align: center;
+      margin: 0 0 18px 0;
+      font-weight: 600;
+    }
+    #uploadWrap {
+      display:flex;
+      justify-content:center;
+      margin-bottom:18px;
+    }
+    #upload {
+      background:rgba(255,255,255,0.25);
+      border:1px solid rgba(255,255,255,0.18);
+      padding:10px 14px;
+      border-radius:10px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      cursor:pointer;
+      color:#0f172a;
+    }
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px; /* increased padding width between charts */
+      align-items: start;
+    }
+    .chart {
+      background: rgba(255,255,255,0.25);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 20px;
+      padding: 40px; /* 40% like padding look */
+      box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+      min-height: 320px;
+    }
+    .full {
+      grid-column: 1 / -1;
+    }
+    #chart1, #chart2, #chart3, #chart4, #chart5 {
+      width: 100%;
+      height: 360px;
+    }
+    footer {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 13px;
+      color: #334155;
+    }
+    @media(max-width: 980px) {
+      .dashboard { grid-template-columns: 1fr; }
+      #chart1, #chart2, #chart3, #chart4, #chart5 { height: 420px; }
+    }
+    .note {
+      text-align:center;
+      margin-bottom:8px;
+      color:#475569;
+      font-size:14px;
+    }
+  </style>
+</head>
+<body>
+  <h2>✨ Glassmorphism Sales Performance Dashboard</h2>
+  <div id="uploadWrap">
+    <label id="upload" for="fileInput">Upload sales JSON</label>
+    <input id="fileInput" type="file" accept=".json" style="display:none" />
+  </div>
+
+  <div class="dashboard">
+    <div class="chart full" id="chart1"></div>
+    <div class="chart" id="chart2"></div>
+    <div class="chart" id="chart3"></div>
+    <div class="chart" id="chart4"></div>
+    <div class="chart" id="chart5"></div>
+  </div>
+
+  <footer>
+    Glassmorphism styled interactive dashboard using Plotly.js
+  </footer>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const uploadLabel = document.getElementById('upload');
+    uploadLabel.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', (evt) => {
+      const f = evt.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        let raw;
+        try {
+          raw = JSON.parse(e.target.result);
+        } catch (err) {
+          alert('Invalid JSON file. Please check the file contents.');
+          return;
+        }
+        let data = Array.isArray(raw) ? raw : [raw];
+
+        // Robust parsing for numeric SALES
+        data = data.map(r => {
+          const copy = Object.assign({}, r);
+          copy.SALES = Number(copy.SALES) || 0;
+          return copy;
+        });
+
+        function groupSum(arr, key) {
+          return arr.reduce((acc, row) => {
+            const k = row[key] || 'Unknown';
+            acc[k] = (acc[k] || 0) + (Number(row.SALES) || 0);
+            return acc;
+          }, {});
+        }
+
+        // Chart 1: Sales Trend Over Time
+        const salesByDate = {};
+        data.forEach(d => {
+          const date = new Date(d.ORDERDATE).toISOString().split('T')[0];
+          salesByDate[date] = (salesByDate[date] || 0) + d.SALES;
+        });
+        const dates = Object.keys(salesByDate).sort();
+        const salesTrend = dates.map(d => salesByDate[d]);
+        Plotly.newPlot('chart1', [{
+          x: dates, y: salesTrend,
+          type: 'scatter', mode: 'lines+markers',
+          line: { color: '#2196f3' }
+        }], { title: 'Sales Trend Over Time' });
+
+        // Chart 2: Sales by Product Line
+        const salesByProduct = groupSum(data, 'PRODUCTLINE');
+        Plotly.newPlot('chart2', [{
+          x: Object.keys(salesByProduct),
+          y: Object.values(salesByProduct),
+          type: 'bar', marker: { color: '#4caf50' }
+        }], { title: 'Sales by Product Line' });
+
+        // Chart 3: Sales by Deal Size
+        const salesByDeal = groupSum(data, 'DEALSIZE');
+        Plotly.newPlot('chart3', [{
+          labels: Object.keys(salesByDeal),
+          values: Object.values(salesByDeal),
+          type: 'pie'
+        }], { title: 'Sales by Deal Size' });
+
+        // Chart 4: Sales by Country
+        const salesByCountry = groupSum(data, 'COUNTRY');
+        Plotly.newPlot('chart4', [{
+          type: 'choropleth',
+          locationmode: 'country names',
+          locations: Object.keys(salesByCountry),
+          z: Object.values(salesByCountry),
+          colorscale: 'Blues',
+          colorbar: { title: 'Sales' }
+        }], { title: 'Sales by Country' });
+
+        // Chart 5: Top Customers
+        const salesByCustomer = groupSum(data, 'CUSTOMERNAME');
+        const sortedCustomers = Object.entries(salesByCustomer).sort((a,b)=>b[1]-a[1]).slice(0,10);
+        Plotly.newPlot('chart5', [{
+          x: sortedCustomers.map(d=>d[1]),
+          y: sortedCustomers.map(d=>d[0]),
+          type: 'bar', orientation: 'h',
+          marker: { color: '#ff9800' }
+        }], { title: 'Top 10 Customers by Sales' });
+      };
+      reader.readAsText(f);
+    });
+  </script>
+</body>
+</html>
